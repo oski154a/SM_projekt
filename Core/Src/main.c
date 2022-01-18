@@ -263,14 +263,16 @@ int main(void)
 	HEATER_Init(&hheater1);
 
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-	control2 = 1000;
+	control2 = 0;
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, control2);
 
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-	control3 = 1000;
+	control3 = 0;
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, control3);
 
+	  LCD_Init(&hlcd1);
 
+	char stringtemp[4];
 	msg_len = strlen("C000\r");
 	msg_len2 = strlen("H000\r");
 
@@ -290,6 +292,7 @@ int main(void)
 	{
 		//ZAD 1-4
 		BMP280_temp = BMP2_ReadTemperature_degC(&hbmp2_1);
+		LCD_printf(&hlcd1, "test", stringtemp);
 		HAL_Delay(250);
 
 		//	  if(HAL_UART_Receive(&huart3, (uint8_t*)cmd_msg, strlen(cmd_msg), 100) == HAL_OK)
