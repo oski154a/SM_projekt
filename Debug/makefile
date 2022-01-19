@@ -62,7 +62,7 @@ main-build: lab6_dom.elf secondary-outputs
 
 # Tool invocations
 lab6_dom.elf: $(OBJS) $(USER_OBJS) C:\Users\User\STM32CubeIDE\workspace_1.7.0\lab6_dom\STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "lab6_dom.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\User\STM32CubeIDE\workspace_1.7.0\lab6_dom\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="lab6_dom.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "lab6_dom.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\User\STM32CubeIDE\workspace_1.7.0\lab6_dom\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="lab6_dom.map" -Wl,--gc-sections -static -L"C:\Users\User\STM32Cube\Repository\Packs\ARM\CMSIS\5.7.0\CMSIS\DSP\Lib\GCC" --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
