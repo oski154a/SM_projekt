@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <stdint.h>
 
 #include "arm_math.h"
 #include "lcd_config.h"
@@ -83,10 +84,13 @@ char text[4];
 _Bool rx_flag = 0;
 uint16_t msg_len;
 uint16_t msg_len2;
-float BMP280_temp;
+uint16_t Heater_PWM_Duty;
+float temperature_current;
+float temperature_reference;
+float temperature_error;
 float BMP280_press;
-float control;
-float control2;
+float PWM_Control_Heater;
+float PWM_Control_Fan;
 float control3;
 float control_temp;
 int a,b,c,d;
@@ -97,6 +101,25 @@ HEATER_HandleTypeDef hheater1 = {
 		.Timer = &htim3, .Channel = TIM_CHANNEL_1, .Duty = 0
 };
 
+const float Tp = 0.001;
+const float fs = 1/Tp;
+//arm_pid_instance_f32 PID;
+
+typedef float float32_t;
+
+typedef struct{
+	float32_t Kp;
+	float32_t Ki;
+	float32_t Kd;
+	float32_t dt;
+}pid_parameters_t;
+
+typedef struct{
+	pid_parameters_t p;
+	float32_t previous_error, previous_integral;
+}pl;
+
+pl pid1;
 
 /* USER CODE END PV */
 
@@ -108,6 +131,31 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+float32_t calculate_discrete_pid(pl* pid, float32_t setpoint, float32_t measured){
+	float32_t u=0, P, I, D, error, integral, derivative;
+
+	error = setpoint-measured;
+
+	//proportional part
+	P = pid->p.Kp * error;
+
+	//integral part
+	integral = pid->previous_integral + (error+pid->previous_error) ; //numerical integrator without anti-windup
+	pid->previous_integral = integral;
+	I = pid->p.Ki*integral*(pid->p.dt/2.0);
+
+	//derivative part
+	derivative = (error - pid->previous_error)/pid->p.dt; //numerical derivative without filter
+	pid->previous_error = error;
+	D = pid->p.Kd*derivative;
+
+	//sum of all parts
+	u = P  + I + D; //without saturation
+
+	return u;
+}
+
+
 void PWM_OUTPUT_Init(PWM_OUTPUT_HandleTypeDef* hpwmout)
 {
 	HAL_TIM_PWM_Start(hpwmout->Timer, hpwmout->Channel);
@@ -129,8 +177,9 @@ void PWM_OUTPUT_SetDuty(PWM_OUTPUT_HandleTypeDef* hpwmout, float duty)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	float duty_heater;
-	float duty_cooler;
+	//	float duty_heater;
+	//	float duty_cooler;
+	//	double value;
 
 
 
@@ -140,14 +189,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 		if(Data[0]=='C')
 		{
-			sscanf((char*)&Data[1], "%f", &control2);
-			if(control2>= 0 && control2<= 1000)
+			sscanf((char*)&Data[1], "%f", &PWM_Control_Fan);
+			if(PWM_Control_Fan>= 0 && PWM_Control_Fan<= 1000)
 			{
-				duty_cooler = control2/10;
-				int resp_len = sprintf((char*)tx_buffer, "Cooler DUTY: %i%%\r\n", (int)duty_cooler);
+				//duty_cooler = PWM_Control_Fan/10;
+				int resp_len = sprintf((char*)tx_buffer, "Fan DUTY: %i%%\r\n", (int)(PWM_Control_Fan/10));
 				HAL_UART_Transmit(&huart3, tx_buffer, resp_len, 10);
 				HAL_UART_Receive_IT(&huart3, Data, msg_len);
-				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, control2);
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
 			}
 			else
 			{
@@ -158,14 +207,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		}
 		else if(Data[0]=='H')
 		{
-			sscanf((char*)&Data[1], "%f", &control);
-			if(control>= 0 && control<= 1000)
+			sscanf((char*)&Data[1], "%f", &PWM_Control_Heater);
+			if(PWM_Control_Heater>= 0 && PWM_Control_Heater<= 1000)
 			{
-				duty_heater = control/10;
-				int resp_len = sprintf((char*)tx_buffer, "Heater DUTY: %i%%\r\n", (int)duty_heater);
+				//duty_heater = PWM_Control_Heater/10;
+				int resp_len = sprintf((char*)tx_buffer, "Heater DUTY: %i%%\r\n", (int)(PWM_Control_Heater/10));
 				HAL_UART_Transmit(&huart3, tx_buffer, resp_len, 10);
 				HAL_UART_Receive_IT(&huart3, Data, msg_len2);
-				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, control);
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, PWM_Control_Heater);
 			}
 			else
 			{
@@ -175,9 +224,29 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			}
 
 		}
+		//		else if(isdigit(Data[0]))
+		//		{
+		//		temperature_reference = atof(Data);
+		//		}
+		//		else if(scanf("%lf", &Data[0]) == 1)
+		//		{
+		//			int resp_len = sprintf((char*)tx_buffer, "It's float: %f\n", Data);
+		//			HAL_UART_Transmit(&huart3, tx_buffer, resp_len, 10);
+		//			HAL_UART_Receive_IT(&huart3, Data, msg_len2);
+		//		 //   sprintf("It's float: %f\n", Data);
+		//		}
+		//		else
+		//		{
+		//			int resp_len = sprintf((char*)tx_buffer, "It's NOT float ... \n", Data);
+		//						HAL_UART_Transmit(&huart3, tx_buffer, resp_len, 10);
+		//						HAL_UART_Receive_IT(&huart3, Data, msg_len2);
+		//					    sprintf("It's float: %f\n", Data);
+		//		//    printf("It's NOT float ... \n");
+		//		}
 		else
 		{
-			int resp_len = sprintf((char*)tx_buffer, "Wrong control\r\n");
+			sscanf((char*)&Data[0], "%f", &temperature_reference);
+			int resp_len = sprintf((char*)tx_buffer, "Temp Curr: %f\r\n", temperature_reference);
 			HAL_UART_Transmit(&huart3, tx_buffer, resp_len, 10);
 			HAL_UART_Receive_IT(&huart3, Data, msg_len);
 		}
@@ -198,26 +267,37 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 
-	//  if(htim->Instance == TIM2)
-	//  {
-	//  	char str_buffer[100];
-	//  	int n;
-	//
-	//
-	//  				//Pomiar temperatury i ciśnienia
-	//				#ifdef BMP2_VER_2021
-	//				float temp = BMP2_ReadTemperature_degC(&hbmp2_1);
-	//				float press = BMP2_ReadPressure_hPa(&hbmp2_1);
-	//n = sprintf(str_buffer, "{\"Temp\":%2.02f} {\"Press\":%4.02f} \r\n", temp, press);
-	//n = sprintf(str_buffer, "{\"Temp\":%2.02f} \r\n", temp);
-	//		n = sprintf(str_buffer, "%2.02f\r\n", temp);
+	if(htim->Instance == TIM2)
+	{
+		char str_buffer[100];
+		int n;
 
-	//		#endif
 
-	//  	str_buffer[n] = '\n';
-	//  	HAL_UART_Transmit(&huart3, (uint8_t*)str_buffer, n+1, 1000);
+		//  				//Pomiar temperatury i ciśnienia
+#ifdef BMP2_VER_2021
+		float temp = BMP2_ReadTemperature_degC(&hbmp2_1);
+		float temp_ref = temperature_reference;
 
-	//}
+
+
+
+		//				float press = BMP2_ReadPressure_hPa(&hbmp2_1);
+		//n = sprintf(str_buffer, "{\"Temp\":%2.02f} {\"Press\":%4.02f} \r\n", temp, press);
+		n = sprintf(str_buffer, "{\"Current Temperature\": %2.02f *C} {\"Reference Temperature\": %2.02f *C}\r\n", temp, temp_ref);
+		//		n = sprintf(str_buffer, "%2.02f\r\n", temp);
+
+#endif
+
+		str_buffer[n] = '\n';
+		HAL_UART_Transmit(&huart3, (uint8_t*)str_buffer, n+1, 1000);
+
+		//        temperature_error = temperature_reference - temperature_current;
+		//
+		//        PWM_Control_Heater = arm_pid_f32(&PID, temperature_error);
+		//
+
+
+	}
 
 }
 
@@ -260,20 +340,32 @@ int main(void)
 	/* USER CODE BEGIN 2 */
 
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-	control = 0;
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, control);
+	PWM_Control_Heater = 0;
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, PWM_Control_Heater);
 
 	HEATER_Init(&hheater1);
 
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-	control2 = 0;
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, control2);
+	PWM_Control_Fan = 0;
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
 
-	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-	control3 = 0;
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, control3);
+	//	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+	//	control3 = 0;
+	//	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, control3);
 
-	LCD_Init(&hlcd1);
+	//		PID.Kp = 0.59;
+	//	    PID.Ki = 0.0004;
+	//	    PID.Kd = 2.88;
+	//	    arm_pid_init_f32(&PID, 1);
+
+	temperature_reference = 30.00;
+
+	uint16_t number_of_samples=1000;
+	float32_t dt=0.001, setpoint=temperature_reference, measured=0, pid_output;
+	pl pid1 = { .p.Kp=0.59, .p.Ki=0.0007, .p.Kd=2.88, .p.dt=dt, .previous_error=0, .previous_integral=0};
+
+
+	//	LCD_Init(&hlcd1);
 
 	char stringtemp[4];
 	msg_len = strlen("C000\r");
@@ -294,9 +386,49 @@ int main(void)
 	while (1)
 	{
 		//ZAD 1-4
-		BMP280_temp = BMP2_ReadTemperature_degC(&hbmp2_1);
-		LCD_printf(&hlcd1, "test", stringtemp);
-		HAL_Delay(250);
+		temperature_current = BMP2_ReadTemperature_degC(&hbmp2_1);
+
+		PWM_Control_Heater = 999.0*calculate_discrete_pid(&pid1, setpoint, temperature_current);
+
+				//Saturation limit
+				if(PWM_Control_Heater < 0)
+				{
+					Heater_PWM_Duty = 0;
+				}
+				else if(PWM_Control_Heater > 999.0)
+				{
+					Heater_PWM_Duty = 999;
+				}
+				else
+				{
+					Heater_PWM_Duty = (uint16_t)PWM_Control_Heater;
+				}
+
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, Heater_PWM_Duty);
+
+		//		LCD_printf(&hlcd1, "test", stringtemp);
+
+		//		temperature_error = temperature_reference - temperature_current;
+		//
+		//		        PWM_Control_Heater = arm_pid_f32(&PID, temperature_error);
+		//
+		//		        //Saturation limit
+		//		        if(PWM_Control_Heater < 0)
+		//		        {
+		//		        	Heater_PWM_Duty = 0;
+		//		        }
+		//		        else if(PWM_Control_Heater > 999.0)
+		//		        {
+		//		        	Heater_PWM_Duty = 999;
+		//		        }
+		//		        else
+		//		        {
+		//		        	Heater_PWM_Duty = (uint16_t)PWM_Control_Heater;
+		//		        }
+		//
+		//				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, Heater_PWM_Duty);
+
+		HAL_Delay(10);
 
 		//	  if(HAL_UART_Receive(&huart3, (uint8_t*)cmd_msg, strlen(cmd_msg), 100) == HAL_OK)
 		//	  {
