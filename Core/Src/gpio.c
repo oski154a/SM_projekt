@@ -66,8 +66,8 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOE, BMP280_CS1_Pin|BMP280_CS2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOF, LCD_E_Pin|LCD_RS_Pin|LCD_D4_Pin|LCD_D5_Pin
-                          |LCD_D6_Pin|LCD_D7_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, LCD_E_Pin|LCD_RS_Pin|LCD_DB4_Pin|LCD_DB5_Pin
+                          |LCD_DB6_Pin|LCD_DB7_Pin|LCD_RW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
@@ -89,9 +89,9 @@ void MX_GPIO_Init(void)
   HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PFPin PFPin PFPin PFPin
-                           PFPin PFPin */
-  GPIO_InitStruct.Pin = LCD_E_Pin|LCD_RS_Pin|LCD_D4_Pin|LCD_D5_Pin
-                          |LCD_D6_Pin|LCD_D7_Pin;
+                           PFPin PFPin PFPin */
+  GPIO_InitStruct.Pin = LCD_E_Pin|LCD_RS_Pin|LCD_DB4_Pin|LCD_DB5_Pin
+                          |LCD_DB6_Pin|LCD_DB7_Pin|LCD_RW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
