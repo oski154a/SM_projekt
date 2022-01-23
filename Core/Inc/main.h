@@ -58,25 +58,13 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LCD_RS_Pin GPIO_PIN_3
+#define LCD_RS_GPIO_Port GPIOE
 #define BMP280_CS1_Pin GPIO_PIN_4
 #define BMP280_CS1_GPIO_Port GPIOE
 #define USER_Btn_Pin GPIO_PIN_13
 #define USER_Btn_GPIO_Port GPIOC
 #define USER_Btn_EXTI_IRQn EXTI15_10_IRQn
-#define LCD_E_Pin GPIO_PIN_0
-#define LCD_E_GPIO_Port GPIOF
-#define LCD_RS_Pin GPIO_PIN_1
-#define LCD_RS_GPIO_Port GPIOF
-#define LCD_DB4_Pin GPIO_PIN_2
-#define LCD_DB4_GPIO_Port GPIOF
-#define LCD_DB5_Pin GPIO_PIN_3
-#define LCD_DB5_GPIO_Port GPIOF
-#define LCD_DB6_Pin GPIO_PIN_4
-#define LCD_DB6_GPIO_Port GPIOF
-#define LCD_DB7_Pin GPIO_PIN_5
-#define LCD_DB7_GPIO_Port GPIOF
-#define LCD_RW_Pin GPIO_PIN_6
-#define LCD_RW_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1
@@ -121,6 +109,16 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define LCD_Enable_Pin GPIO_PIN_3
+#define LCD_Enable_GPIO_Port GPIOD
+#define LCD_DATA4_Pin GPIO_PIN_4
+#define LCD_DATA4_GPIO_Port GPIOD
+#define LCD_DATA5_Pin GPIO_PIN_5
+#define LCD_DATA5_GPIO_Port GPIOD
+#define LCD_DATA6_Pin GPIO_PIN_6
+#define LCD_DATA6_GPIO_Port GPIOD
+#define LCD_DATA7_Pin GPIO_PIN_7
+#define LCD_DATA7_GPIO_Port GPIOD
 #define RMII_TX_EN_Pin GPIO_PIN_11
 #define RMII_TX_EN_GPIO_Port GPIOG
 #define RMII_TXD0_Pin GPIO_PIN_13

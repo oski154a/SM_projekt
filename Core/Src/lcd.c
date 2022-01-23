@@ -1,269 +1,180 @@
 /**
-  ******************************************************************************
-  * @file    lcd.c
-  * @author  Olivier Van den Eede [ https://github.com/4ilo/HD44780-Stm32HAL ]
-  * @author  AW (adjustments for STM32F7)
-  * @version V2.0
-  * @date    10-Jun-2018
-  * @brief   Simple HD44780 driver library for STM32F7.
-  *          NOTE!: This code provides only WRITE features, no READ features.
-  *
-  ******************************************************************************
-  */
-  
-/* Includes ------------------------------------------------------------------*/
-#include "lcd.h"
+*	@author Dominik Luczak
+*	@date 2015
+*	@details LCD driver HD44780 in 4 bits mode. Before use initialize GPIO.
+*/
 
-/* Typedef -------------------------------------------------------------------*/
+#include "LCD.h"
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <ctype.h>
 
-/* Define --------------------------------------------------------------------*/
-#define LCD_NUMBER_BUF_SIZE 11
-#define LCD_PRINTF_BUF_SIZE 64
-
-/* Macro ---------------------------------------------------------------------*/
-#ifdef LCD_USE_TIMER
-#define __LCD_Delay(__HANDLE__, delay_ms) lcd_delay_us((__HANDLE__),(float)delay_ms * 1000.0)
-#else
-#define __LCD_Delay(__HANDLE__, delay_ms)   HAL_Delay((uint32_t)delay_ms);
-#endif
-
-
-/* Private variables ---------------------------------------------------------*/
-const uint8_t LCD_ROW_16[] = {0x00, 0x40, 0x10, 0x50};
-const uint8_t LCD_ROW_20[] = {0x00, 0x40, 0x14, 0x54};
-
-/* Public variables ----------------------------------------------------------*/
-
-/* Private function prototypes -----------------------------------------------*/
-void lcd_write_command(LCD_HandleTypeDef* hlcd, uint8_t command);
-void lcd_write_data(LCD_HandleTypeDef* hlcd, uint8_t data);
-void lcd_write(LCD_HandleTypeDef* hlcd, uint8_t data, uint8_t len);
-#ifdef LCD_USE_TIMER
-void lcd_delay_us(LCD_HandleTypeDef* hlcd, uint32_t delay_us);
-#endif
-
-/* Private function ----------------------------------------------------------*/
 /**
- * @brief Write a byte to the command register
- * @param[in] hlcd    LCD handler
- * @param[in] command Display command @see lcd.h/Define
- * @return None
- */
-void lcd_write_command(LCD_HandleTypeDef* hlcd, uint8_t command)
+* Software busy delay
+* @param[in] tick Number of ticks to wait
+*/
+static void software_delay(uint32_t tick)
 {
-  HAL_GPIO_WritePin(hlcd->RS_Port, hlcd->RS_Pin, LCD_COMMAND_REG);    // Write to command register
-
-  if(hlcd->Mode == LCD_4_BIT_MODE)
-  {
-    if(hlcd->IsInitialized) // Before initialization ignore most significant nibble
-    {
-      lcd_write(hlcd, (command >> 4), LCD_NIB);
-    }
-    lcd_write(hlcd, command & 0x0F, LCD_NIB);
-  }
-  else
-  {
-     lcd_write(hlcd, command, LCD_BYTE);
-  }
+	uint32_t delay;
+	while(tick-->0)
+	{
+		for(delay=5; delay>0; delay--){
+			asm("nop");
+			asm("nop");
+			asm("nop");
+			asm("nop");
+		}
+	}
 }
 
 /**
- * @brief Write a byte to the data register
- * @param[in] hlcd LCD handler
- * @param[in] data Display data byte
- * @return None
- */
-void lcd_write_data(LCD_HandleTypeDef* hlcd, uint8_t data)
+* Initialization of LCD display in 4 bits mode
+* @details Before use initialize GPIOs
+*/
+void LCD_init(void)
 {
-  HAL_GPIO_WritePin(hlcd->RS_Port, hlcd->RS_Pin, LCD_DATA_REG);     // Write to data register
+	software_delay(1000000);
+	LCD_send_4bits(0x03,0,0);	software_delay(1000000);
+	LCD_send_4bits(0x03,0,0);	software_delay(1000000);
+	LCD_send_4bits(0x03,0,0);	software_delay(400000);
+	//Set 4-bit
+	LCD_send_4bits(0x02,0,0);	software_delay(400000);
 
-  if(hlcd->Mode == LCD_4_BIT_MODE)
-  {
-    lcd_write(hlcd, data >> 4, LCD_NIB);
-    lcd_write(hlcd, data & 0x0F, LCD_NIB);
-  }
-  else
-  {
-    lcd_write(hlcd, data, LCD_BYTE);
-  }
+	//Function SET
+	LCD_write_command(LCD_FUNCTION_INSTRUCTION | LCD_FUNCTION_DL_4BIT | LCD_FUNCTION_LINE_NUMBER_2 | LCD_FUNCTION_FONT_5x8); software_delay(50000);
+	//Display on
+	LCD_write_command(LCD_DISPLAY_INSTRUCTION | LCD_DISPLAY_ON | LCD_DISPLAY_CURSOR_OFF | LCD_DISPLAY_BLINK_OFF);software_delay(100000);
+	//Display clear
+	LCD_write_command(LCD_CLEAR_INSTRUCTION);software_delay(100000);
+	//Entry mode
+	LCD_write_command(LCD_ENTRY_MODE_INSTRUCTION | LCD_ENTRY_MODE_INCREMENT | LCD_ENTRY_MODE_SHIFT_DISPLAY_OFF);software_delay(100000);
+	//Init end
+
+	//Return home
+	LCD_write_command(LCD_HOME_INSTRUCTION);	software_delay(100000);
+	
+	LCD_write_text("Dominik Luczak");
+	LCD_goto_line(1);
+	LCD_write_text("Text in line 2");
+
+	uint8_t custom_char1[] = LCD_CUSTOM_CHAR_ARROW_UP_PATERN;
+	LCD_create_custom_character(custom_char1, 0);
+	uint8_t custom_char2[] = LCD_CUSTOM_CHAR_ARROW_DOWN_PATERN;
+	LCD_create_custom_character(custom_char2, 1);
+	uint8_t custom_char3[] = LCD_CUSTOM_CHAR_ARROW_OUT_PATERN;
+	LCD_create_custom_character(custom_char3, 2);
+	uint8_t custom_char4[] = LCD_CUSTOM_CHAR_ARROW_INTO_PATERN;
+	LCD_create_custom_character(custom_char4, 3);
+	uint8_t custom_char5[] = LCD_CUSTOM_CHAR_ARROW_ENTER_PATERN;
+	LCD_create_custom_character(custom_char5, 4);
+	uint8_t custom_char6[] = LCD_CUSTOM_CHAR_ARROW_PLUS_MINUS_PATERN;
+	LCD_create_custom_character(custom_char6, 5);
+
+
 }
 
-/**
- * @brief Set len bits on the bus and toggle the enable line
- * @param[in] hlcd LCD handler
- * @param[in] data Data byte
- * @param[in] len  Data port size (length): 4 ( LCD_NIB )or 8 ( LCD_BYTE ) bits
- * @return None
- */
-void lcd_write(LCD_HandleTypeDef* hlcd, uint8_t data, uint8_t len)
+
+void LCD_send_4bits(uint8_t data_to_send, char RS, char RW)
 {
-  HAL_GPIO_WritePin(hlcd->E_Port, hlcd->E_Pin, GPIO_PIN_SET);
+	LCD_GPIO_SET_VALUE(LCD_GPIO_RS_Pin, RS, LCD_GPIO_RS_Port);
+	//set RW to LOW (GND) by hardware
 
-  for(uint8_t i = 0; i < len; i++)
-    HAL_GPIO_WritePin(hlcd->DATA_Ports[i], hlcd->DATA_Pins[i], (data >> i) & 0x01);
-
-  HAL_GPIO_WritePin(hlcd->E_Port, hlcd->E_Pin, GPIO_PIN_RESET); // Data receive on falling edge
-  __LCD_Delay(hlcd, 0.05);  // > 41 us
+	if(data_to_send&(0x01<<0)){LCD_DATABIT_ON(4);}else{LCD_DATABIT_OFF(4);}
+	if(data_to_send&(0x01<<1)){LCD_DATABIT_ON(5);}else{LCD_DATABIT_OFF(5);}
+	if(data_to_send&(0x01<<2)){LCD_DATABIT_ON(6);}else{LCD_DATABIT_OFF(6);}
+	if(data_to_send&(0x01<<3)){LCD_DATABIT_ON(7);}else{LCD_DATABIT_OFF(7);}
+	software_delay(100);
+	
+	LCD_GPIO_ON(LCD_GPIO_E_Pin, LCD_GPIO_E_Port);	software_delay(100);
+	LCD_GPIO_OFF(LCD_GPIO_E_Pin, LCD_GPIO_E_Port);	software_delay(100);
+	LCD_GPIO_ON(LCD_GPIO_E_Pin, LCD_GPIO_E_Port);	software_delay(1000);
 }
 
-#ifdef LCD_USE_TIMER
-/**
- * @brief LCD delay function
- * @param[in] hlcd LCD handler
- * @param[in] delay_us Delay period in microseconds
- * @return None
- */
-void lcd_delay_us(LCD_HandleTypeDef* hlcd, uint32_t delay_us)
+void LCD_send_8bits_twice_4bits(uint8_t data, char RS, char RW)
 {
-  __HAL_TIM_SET_COUNTER(hlcd->Timer, 0);
-  HAL_TIM_Base_Start(hlcd->Timer);
-  while(__HAL_TIM_GET_COUNTER(hlcd->Timer) < delay_us);
-  HAL_TIM_Base_Stop(hlcd->Timer);
+	LCD_send_4bits((data>>4), RS, RW);	//high part
+	LCD_send_4bits(data, RS, RW);		//low part
 }
-#endif
 
-/* Public function -----------------------------------------------------------*/
-
-/**
- * @brief LCD initialization procedure.
- * @note Cursor off, Cursor increment on, No blink @see HD44780 technical note.
- * @param[in] hlcd LCD handler
- * @return None 
- */
-void LCD_Init(LCD_HandleTypeDef* hlcd)
+void LCD_write_command(uint8_t command)
 {
-  hlcd->IsInitialized = 0;
-
-  __LCD_Delay(hlcd, 15.2);         // >15 ms
-
-  if(hlcd->Mode == LCD_4_BIT_MODE)
-  {
-    lcd_write_command(hlcd, 0x3);  // 0011
-    __LCD_Delay(hlcd, 4.2);        // > 4.1 ms
-    lcd_write_command(hlcd, 0x3);  // 0011
-    __LCD_Delay(hlcd, 0.2);        // > 0.1 ms
-    lcd_write_command(hlcd, 0x3);  // 0011
-    lcd_write_command(hlcd, 0x2);  // 0010
-
-    hlcd->IsInitialized = 1;
-
-    lcd_write_command(hlcd, LCD_FUNCTION_SET | LCD_OPT_N);
-  }
-  else if(hlcd->Mode == LCD_8_BIT_MODE) /* TODO: test 8-bit interface */
-  {
-	lcd_write_command(hlcd, 0x30); // 0011 XXXX
-	__LCD_Delay(hlcd, 4.2);        // > 4.1 ms
-	lcd_write_command(hlcd, 0x30); // 0011 XXXX
-	__LCD_Delay(hlcd, 0.2);        // > 0.1 ms
-	lcd_write_command(hlcd, 0x30); // 0011 XXXX
-
-	hlcd->IsInitialized = 1;
-
-    lcd_write_command(hlcd, LCD_FUNCTION_SET | LCD_OPT_DL | LCD_OPT_N);
-  }
-
-  lcd_write_command(hlcd, LCD_CLEAR_DISPLAY);                        // Clear screen
-  __LCD_Delay(hlcd, 1.6);                                            // > 1.52 ms
-  lcd_write_command(hlcd, LCD_DISPLAY_ON_OFF_CONTROL | LCD_OPT_D);   // LCD on, Cursor off, No blink
-  lcd_write_command(hlcd, LCD_ENTRY_MODE_SET | LCD_OPT_INC);         // Cursor increment on
+	LCD_send_8bits_twice_4bits(command, 0, 0);
+	software_delay(10000);
 }
 
-/**
- * @brief Write a decimal number on the current position.
- * @param[in] hlcd   LCD handler
- * @param[in] number Decimal number, max. 10 digits
- * @return None 
- */
-void LCD_printInt(LCD_HandleTypeDef* hlcd, int number)
+void LCD_write_data(char byte_data)
 {
-  char buffer[LCD_NUMBER_BUF_SIZE];
-  sprintf(buffer, "%d", number);
-
-  LCD_printStr(hlcd, buffer);
+	LCD_send_8bits_twice_4bits(byte_data, 1, 0);
 }
 
-/**
- * @brief Write a hexadecimal number on the current position.
- * @param[in] hlcd   LCD handler
- * @param[in] number Hexadecimal number, max. 10 digits
- * @return None 
- */
-void LCD_printHex(LCD_HandleTypeDef* hlcd, int number)
+void LCD_write_char(char character)
 {
-  char buffer[LCD_NUMBER_BUF_SIZE];
-  sprintf(buffer, "%x", number);
-
-  LCD_printStr(hlcd, buffer);
+	if(isprint(character))	LCD_write_data(character);
 }
 
-/**
- * @brief Write a string on the current position.
- * @param[in] hlcd LCD handler
- * @param[in] str  Null-terminated string
- * @return None 
- */
-void LCD_printStr(LCD_HandleTypeDef* hlcd, char* str)
+
+
+void LCD_write_text(char* pText){
+	while(*pText!='\0')
+	{
+		LCD_write_char(*pText);
+		pText++;
+	}
+}
+
+void LCD_goto_xy(uint8_t line, uint8_t y)
 {
-  for(uint8_t i = 0; i < strlen(str); i++)
-    lcd_write_data(hlcd, str[i]);
+	switch(line){
+		case 0: line=0x00; break;
+		case 1: line=0x40; break;
+		default: line=0;
+	}
+	LCD_write_command(LCD_DDRAM_ADDRESS | (line+y));
 }
 
-/**
- * @brief Set the cursor position.
- * @param[in] hlcd LCD handler
- * @param[in] row  Display row (line): 0 to N
- * @param[in] col  Display column: 0 to 15 (16 character display) or 19 (20 character display)
- * @return None 
- */
-void LCD_SetCursor(LCD_HandleTypeDef* hlcd, uint8_t row, uint8_t col)
+void LCD_goto_line(uint8_t line)
 {
-  #ifdef LCD20xN
-  lcd_write_command(hlcd, LCD_SET_DDRAM_ADDR + LCD_ROW_20[row] + col);
-  #endif
-
-  #ifdef LCD16xN
-  lcd_write_command(hlcd, LCD_SET_DDRAM_ADDR + LCD_ROW_16[row] + col);
-  #endif
+	LCD_goto_xy(line, 0);
 }
 
-/**
- * @brief Clear the screen.
- * @param[in] hlcd LCD handler
- * @return None 
- */
-void LCD_Clear(LCD_HandleTypeDef* hlcd) {
-  lcd_write_command(hlcd, LCD_CLEAR_DISPLAY);
-}
-
-/**
- * @brief Clear the screen.
- * @param[in] hlcd   LCD handler
- * @param[in] code   Defined character code in display memory @see HD44780 technical note.
- * @param[in] bitmap Defined character array @see HD44780 technical note.
- * @return None 
- */
-void LCD_DefineChar(LCD_HandleTypeDef* hlcd, uint8_t code, uint8_t bitmap[]){
-  lcd_write_command(hlcd, LCD_SETCGRAM_ADDR + (code << 3));
-  
-  for(uint8_t i=0; i < 8; ++i)
-    lcd_write_data(hlcd, bitmap[i]);
-}
-
-#ifdef LCD_PRINTF_ENABLE
-/**
- * @brief Write text in standard format on the current position.
- * @param[in] hlcd   LCD handler
- * @param[in] format Text format @see http://www.cplusplus.com/reference/cstdio/printf/
- * @param[in] ...    Variadic arguments
- * @return None
- */
-void LCD_printf(LCD_HandleTypeDef* hlcd, const char* format, ...)
+void LCD_printf_line(const char * format, ... )
 {
-  char buffer[LCD_PRINTF_BUF_SIZE];
-  va_list args;
-  va_start(args, format);
-  vsprintf(buffer,format, args);
-  LCD_printStr(hlcd, buffer);
-  va_end(args);
+	#define LCD_BUFFER_SIZE (LCD_MAXIMUM_LINE_LENGTH+1)
+	char text_buffer[LCD_BUFFER_SIZE];
+	uint8_t length=0;
+	va_list args;
+	va_start (args, format);
+	length=vsnprintf(text_buffer, LCD_BUFFER_SIZE, format, args);
+	LCD_write_text(text_buffer);
+	va_end (args);
+	if(length>=1 && length<LCD_MAXIMUM_LINE_LENGTH){
+		snprintf(text_buffer, LCD_BUFFER_SIZE, "%*c", LCD_MAXIMUM_LINE_LENGTH-length, ' ');
+		LCD_write_text(text_buffer);
+	}
 }
-#endif
+
+uint8_t LCD_printf(const char * format, ... )
+{
+	#define LCD_BUFFER_SIZE (LCD_MAXIMUM_LINE_LENGTH+1)
+	char text_buffer[LCD_BUFFER_SIZE];
+	uint8_t length=0;
+	va_list args;
+	va_start (args, format);
+	length=vsnprintf(text_buffer, LCD_BUFFER_SIZE, format, args);
+	LCD_write_text(text_buffer);
+	va_end (args);
+	return length;
+}
+
+
+void LCD_create_custom_character(uint8_t* pPattern, uint8_t position)
+{
+	LCD_write_command(LCD_CGRAM_ADDRESS | (position*8));
+	for (uint8_t i=0; i<8; i++)
+		LCD_write_data(pPattern[i]);
+}
+
+
+
+

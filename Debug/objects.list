@@ -1,7 +1,6 @@
-"./Core/Src/LCD_HD44780.o"
+"./Core/Src/LCD.o"
 "./Core/Src/bmp2.o"
 "./Core/Src/bmp2_config.o"
-"./Core/Src/delays.o"
 "./Core/Src/gpio.o"
 "./Core/Src/main.o"
 "./Core/Src/spi.o"

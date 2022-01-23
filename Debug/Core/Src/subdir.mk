@@ -5,10 +5,9 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Core/Src/LCD_HD44780.c \
+../Core/Src/LCD.c \
 ../Core/Src/bmp2.c \
 ../Core/Src/bmp2_config.c \
-../Core/Src/delays.c \
 ../Core/Src/gpio.c \
 ../Core/Src/main.c \
 ../Core/Src/spi.c \
@@ -22,10 +21,9 @@ C_SRCS += \
 ../Core/Src/usb_otg.c 
 
 OBJS += \
-./Core/Src/LCD_HD44780.o \
+./Core/Src/LCD.o \
 ./Core/Src/bmp2.o \
 ./Core/Src/bmp2_config.o \
-./Core/Src/delays.o \
 ./Core/Src/gpio.o \
 ./Core/Src/main.o \
 ./Core/Src/spi.o \
@@ -39,10 +37,9 @@ OBJS += \
 ./Core/Src/usb_otg.o 
 
 C_DEPS += \
-./Core/Src/LCD_HD44780.d \
+./Core/Src/LCD.d \
 ./Core/Src/bmp2.d \
 ./Core/Src/bmp2_config.d \
-./Core/Src/delays.d \
 ./Core/Src/gpio.d \
 ./Core/Src/main.d \
 ./Core/Src/spi.d \
