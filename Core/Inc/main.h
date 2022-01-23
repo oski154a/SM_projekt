@@ -62,9 +62,9 @@ void Error_Handler(void);
 #define LCD_RS_GPIO_Port GPIOE
 #define BMP280_CS1_Pin GPIO_PIN_4
 #define BMP280_CS1_GPIO_Port GPIOE
-#define USER_Btn_Pin GPIO_PIN_13
-#define USER_Btn_GPIO_Port GPIOC
-#define USER_Btn_EXTI_IRQn EXTI15_10_IRQn
+#define Button_Pin GPIO_PIN_13
+#define Button_GPIO_Port GPIOC
+#define Button_EXTI_IRQn EXTI15_10_IRQn
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1

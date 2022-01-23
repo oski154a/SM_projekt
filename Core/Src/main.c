@@ -40,11 +40,11 @@
 //#include "LCD_HD44780.h"
 #include "LCD.h"
 
-#define BMP2_VER_2021
+//#define BMP2_VER_2021
 
-#ifdef BMP2_VER_2021
+//#ifdef BMP2_VER_2021
 #include "bmp2_config.h"
-#endif
+//#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -144,19 +144,67 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+	//float temp_cur;
+	//float temp_ref;
+
 	if(htim->Instance == TIM2)
 	{
 		char str_buffer[100];
 		int n;
 
-#ifdef BMP2_VER_2021
-		float temp = BMP2_ReadTemperature_degC(&hbmp2_1);
+		float temp_cur = BMP2_ReadTemperature_degC(&hbmp2_1);
 		float temp_ref = temperature_reference;
-		n = sprintf(str_buffer, "{\"Current Temperature\": %2.02f *C} {\"Reference Temperature\": %2.02f *C}\r\n", temp, temp_ref);
-#endif
+		n = sprintf(str_buffer, "{\"Current Temperature\": %2.02f *C} {\"Reference Temperature\": %2.02f *C}\r\n", temp_cur, temp_ref);
 
 		str_buffer[n] = '\n';
 		HAL_UART_Transmit(&huart3, (uint8_t*)str_buffer, n+1, 1000);
+	}
+	//	if(htim->Instance == TIM5)
+	//		{
+	//			temp_cur = BMP2_ReadTemperature_degC(&hbmp2_1);
+	//			temp_ref = temperature_reference;
+	//				LCD_write_text("Temp ref:");
+	//				LCD_printf("%2.02f",temp_ref);
+	//				LCD_printf(" C");
+	//				LCD_goto_line(1);
+	//				LCD_write_text("Temp cur:");
+	//				LCD_printf("%2.02f",temp_cur);
+	//				LCD_write_text(" C");
+	//				LCD_goto_line(2);
+	//		}
+	if(htim->Instance == TIM7)
+	{
+		temperature_current = BMP2_ReadTemperature_degC(&hbmp2_1);
+		temperature_error = temperature_reference - temperature_current;
+		PWM_Control_Heater = 999.0*arm_pid_f32(&PID, temperature_error);
+
+		//Saturation limit
+		if(PWM_Control_Heater < 0)
+		{
+			Heater_PWM_Duty = 0;
+		}
+		else if(PWM_Control_Heater > 999.0)
+		{
+			Heater_PWM_Duty = 999;
+		}
+		else
+		{
+			Heater_PWM_Duty = (uint16_t)PWM_Control_Heater;
+		}
+
+		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, Heater_PWM_Duty);
+
+		if(temperature_reference < temperature_current)
+		{
+			PWM_Control_Fan = 1000;
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
+		}
+		else
+		{
+			PWM_Control_Fan = 0;
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
+		}
+
 	}
 }
 
@@ -198,6 +246,17 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
+	BMP2_Init(&hbmp2_1);
+
+	temperature_reference = 30.00;
+
+	PID.Kp = 1.3;
+	PID.Ki = 0.001*Tp;
+	PID.Kd = 3.3/Tp;
+	arm_pid_init_f32(&PID, 1);
+
+	msg_len = strlen("C000\r");
+	msg_len2 = strlen("H000\r");
 
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 	PWM_Control_Heater = 0;
@@ -207,29 +266,11 @@ int main(void)
 	PWM_Control_Fan = 0;
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
 
-	PID.Kp = 1.3;
-	PID.Ki = 0.001*Tp;
-	PID.Kd = 3.3/Tp;
-	arm_pid_init_f32(&PID, 1);
-
-	temperature_reference = 30.00;
-
 	LCD_init();
 	LCD_write_command(LCD_CLEAR_INSTRUCTION);
-//	LCD_write_text("Temp ref: ");
-//	LCD_printf("%f",temperature_reference);
-//	LCD_goto_line(1);
-//	LCD_write_text("Temp cur: ");
-//	LCD_printf("%f",temperature_current);
-//	LCD_printf("temp: ", "%f",temperature_reference);
-	msg_len = strlen("C000\r");
-	msg_len2 = strlen("H000\r");
-
-#ifdef BMP2_VER_2021
-	BMP2_Init(&hbmp2_1);
-#endif
 
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_TIM_Base_Start_IT(&htim5);
 	HAL_TIM_Base_Start_IT(&htim7);
 	HAL_UART_Receive_IT(&huart3, Data, msg_len);
 
@@ -239,61 +280,16 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	while (1)
 	{
-	//	LCD_write_data(temperature_reference);
-	//	LCD_printf_line("tempref");
-		//	LCD_write_text("Temp ref");
-		//	LCD_goto_line(1);
-	//		LCD_write_text("Temp cur");
 
-		//	LCD_printInt(&hlcd1, 5);
-
-		//			LCD_Cls();
-		//			LCD_Locate(0,0);
-		//			LCD_String(" STM32");
-		//			LCD_Locate(0,1);
-		//			LCD_String("www.msalamon.pl ");
-
-		temperature_current = BMP2_ReadTemperature_degC(&hbmp2_1);
-		temperature_error = temperature_reference - temperature_current;
-		PWM_Control_Heater = 999.0*arm_pid_f32(&PID, temperature_error);
-
-		//Saturation limit
-		if(PWM_Control_Heater < 0)
-		{
-			Heater_PWM_Duty = 0;
-		}
-		else if(PWM_Control_Heater > 999.0)
-		{
-			Heater_PWM_Duty = 999;
-		}
-		else
-		{
-			Heater_PWM_Duty = (uint16_t)PWM_Control_Heater;
-		}
-
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, Heater_PWM_Duty);
-
-		//				if(temperature_reference < temperature_current)
-		//				{
-		//					PWM_Control_Fan = 1000;
-		//					__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
-		//				}
-		//				else if(temperature_reference > temperature_current)
-		//				{
-		//					PWM_Control_Fan = 0;
-		//					__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, PWM_Control_Fan);
-		//				}
-
-			LCD_write_text("Temp ref:");
-			LCD_printf("%2.02f",temperature_reference);
-			LCD_printf(" C");
-			LCD_goto_line(1);
-			LCD_write_text("Temp cur:");
-			LCD_printf("%2.02f",temperature_current);
-			LCD_write_text(" C");
-			LCD_goto_line(2);
-
-		HAL_Delay(10);
+		LCD_write_text("Temp ref:");
+		LCD_printf("%2.02f",temperature_reference);
+		LCD_printf(" C");
+		LCD_goto_line(1);
+		LCD_write_text("Temp cur:");
+		LCD_printf("%2.02f",temperature_current);
+		LCD_write_text(" C");
+		LCD_goto_line(2);
+		HAL_Delay(100);
 
     /* USER CODE END WHILE */
 
