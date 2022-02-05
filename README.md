@@ -1,2 +1,2 @@
-# lab6_dom
- Regulacja temperatury
+# Systemy mikroprocesorowe - projekt
+ Układ automatycznej regulacji temperatury
