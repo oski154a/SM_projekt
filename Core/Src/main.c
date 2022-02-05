@@ -66,9 +66,8 @@ float temperature_reference;
 float temperature_error;
 float PWM_Control_Heater;
 float PWM_Control_Fan;
-const float Tp = 0.009;
+const float Tp = 0.250;
 arm_pid_instance_f32 PID;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,12 +119,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		HAL_UART_Transmit(&huart3, (uint8_t*)str_buffer, n+1, 1000);
 	}
 
-	if(htim->Instance == TIM7)
+	if(htim->Instance == TIM5)
 	{
 		temperature_current = BMP2_ReadTemperature_degC(&hbmp2_1);
 		temperature_error = temperature_reference - temperature_current;
 		PWM_Control_Heater = 999.0*arm_pid_f32(&PID, temperature_error);
-		PWM_Control_Fan = -PWM_Control_Heater;
 
 		//Saturation limit
 		if(PWM_Control_Heater < 0)
@@ -205,6 +203,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM7_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
 	BMP2_Init(&hbmp2_1);
 
@@ -229,6 +228,7 @@ int main(void)
 	LCD_write_command(LCD_CLEAR_INSTRUCTION);
 
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_TIM_Base_Start_IT(&htim5);
 	HAL_TIM_Base_Start_IT(&htim7);
 	HAL_UART_Receive_IT(&huart3, Data, msg_len);
 
